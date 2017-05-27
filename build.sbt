@@ -1,5 +1,9 @@
-lazy val root = (project in file(".")).
-  settings(
+val tutSettings = Seq(
+  tutTargetDirectory := file("days")
+)
+
+lazy val root = (project in file("."))
+  .settings(
     inThisBuild(List(
       organization := "com.dfrancoeur",
       scalaVersion := "2.12.2",
@@ -23,3 +27,5 @@ lazy val root = (project in file(".")).
       "org.scalamacros" % "paradise" % "2.1.0" cross CrossVersion.full
     )
   )
+  .enablePlugins(TutPlugin)
+  .settings(tutSettings)
