@@ -1,5 +1,5 @@
 val tutSettings = Seq(
-  tutTargetDirectory := file("days")
+  tutTargetDirectory := file("content")
 )
 
 lazy val root = (project in file("."))

@@ -1,3 +1,5 @@
+package org.dfrancoeur.terminal
+
 import cats._
 import cats.implicits._
 import freestyle._
