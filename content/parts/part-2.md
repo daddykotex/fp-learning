@@ -14,6 +14,9 @@ import scala.concurrent.ExecutionContext
 
 scala> import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.ExecutionContext.Implicits.global
+
+scala> import scala.language.higherKinds
+import scala.language.higherKinds
 ```
 
 Given the data structure, you can customize the behavior of the program by "executing" with different interpreters.
@@ -22,8 +25,8 @@ The example brings a simple terminal to the table. Let's build a very similar in
 
 ```scala
 scala> trait Terminal {
-     |     def read: String
-     |     def write(line: String): Unit
+     |   def read: String
+     |   def write(line: String): Unit
      | }
 defined trait Terminal
 ```
@@ -32,8 +35,8 @@ This terminal can read from the console, and write to it. Here is a very naive d
 
 ```scala
 scala> case object ConsoleTerminal extends Terminal {
-     |     override def read: String = ???
-     |     override def write(line: String): Unit = ???
+     |   override def read: String = ???
+     |   override def write(line: String): Unit = ???
      | }
 defined object ConsoleTerminal
 ```
@@ -47,20 +50,20 @@ scala> import scala.concurrent.Future
 import scala.concurrent.Future
 
 scala> trait AsyncTerminal {
-     |     def read: Future[String]
-     |     def write(line: String): Future[Unit]
+     |   def read: Future[String]
+     |   def write(line: String): Future[Unit]
      | }
 defined trait AsyncTerminal
 
 scala> case object AsyncConsoleTerminal extends AsyncTerminal {
-     |     override def read: Future[String] = ???
-     |     override def write(line: String): Future[Unit] = ???
+     |   override def read: Future[String] = ???
+     |   override def write(line: String): Future[Unit] = ???
      | }
 defined object AsyncConsoleTerminal
 
 scala> class SyncConsoleTerminal(async: AsyncTerminal) extends Terminal {
-     |     override def read: String = ???
-     |     override def write(line: String): Unit = ???
+     |   override def read: String = ???
+     |   override def write(line: String): Unit = ???
      | }
 defined class SyncConsoleTerminal
 ```
@@ -71,8 +74,8 @@ In the synchronous version, we work directly with the output type where as in th
 
 ```scala
 scala> trait Terminal[C[_]] {
-     |     def read: C[String]
-     |     def write(line: String): C[Unit]
+     |   def read: C[String]
+     |   def write(line: String): C[Unit]
      | }
 defined trait Terminal
 ```
@@ -85,8 +88,8 @@ Now we can redefine our async interface replacing `C` with `Future`.
 
 ```scala
 scala> case object AsyncConsoleTerminal extends Terminal[Future] {
-     |     override def read: Future[String] = ???
-     |     override def write(line: String): Future[Unit] = ???
+     |   override def read: Future[String] = ???
+     |   override def write(line: String): Future[Unit] = ???
      | }
 defined object AsyncConsoleTerminal
 ```
@@ -98,8 +101,8 @@ scala> type Now[T] = T
 defined type alias Now
 
 scala> case object ConsoleTerminal extends Terminal[Now] {
-     |     override def read: String = ???
-     |     override def write(line: String): Unit = ???
+     |   override def read: String = ???
+     |   override def write(line: String): Unit = ???
      | }
 defined object ConsoleTerminal
 ```
@@ -108,15 +111,15 @@ Now we have a common interface for both our synchronous and asynchronous termina
 
 ```scala
 scala> def helloSync(term: Terminal[Now]): String = {
-     |     val input: String = term.read
-     |     term.write(input)
-     |     input
+     |   val input: String = term.read
+     |   term.write(input)
+     |   input
      | }
 helloSync: (term: Terminal[Now])String
 
 scala> def helloAsync(term: Terminal[Future]): Future[String] = {
-     |     val input: Future[String] = term.read
-     |     input flatMap { in => term.write(in) map {_ => in} }
+     |   val input: Future[String] = term.read
+     |   input flatMap { in => term.write(in) map {_ => in} }
      | }
 helloAsync: (term: Terminal[scala.concurrent.Future])scala.concurrent.Future[String]
 ```
@@ -125,8 +128,8 @@ Easy enough, easy to understand and easy to use, but that code is not so DRY. Is
 
 ```scala
 scala> trait Execution[C[_]] {
-     |     def doAndThen[A, B](a: C[A])(f: A => C[B]): C[B]
-     |     def create[A](a: => A): C[A]
+     |   def doAndThen[A, B](a: C[A])(f: A => C[B]): C[B]
+     |   def create[A](a: A): C[A]
      | }
 defined trait Execution
 ```
@@ -134,12 +137,12 @@ defined trait Execution
 From this point on, if we have an instance of `Execution`, we can chain our terminal operations to build a program:
 
 ```scala
-scala> def hello[C[_]](term: Terminal[C], ex: Execution[C]) = {
-     |     ex.doAndThen(term.read) { in =>
-     |         ex.doAndThen(term.write(in)) { _ =>
-     |             ex.create(in)
-     |         }
+scala> def hello[C[_]](term: Terminal[C], ex: Execution[C]): C[String] = {
+     |   ex.doAndThen(term.read) { in =>
+     |     ex.doAndThen(term.write(in)) { _ =>
+     |       ex.create(in)
      |     }
+     |   }
      | }
 hello: [C[_]](term: Terminal[C], ex: Execution[C])C[String]
 ```
@@ -147,16 +150,16 @@ In order to use our function, we need an implementation of `Execution` for both 
 
 ```scala
 scala> val nowExec: Execution[Now] = new Execution[Now] {
-     |     def doAndThen[A, B](a: Now[A])(f: A => Now[B]): Now[B] = f(a)
-     |     def create[A](a: => A): Now[A] = a
+     |   def doAndThen[A, B](a: Now[A])(f: A => Now[B]): Now[B] = f(a)
+     |   def create[A](a: A): Now[A] = a
      | }
-nowExec: Execution[Now] = $anon$1@693970d8
+nowExec: Execution[Now] = $anon$1@7c82068
 
 scala> val futureExec: Execution[Future] = new Execution[Future] {
-     |     def doAndThen[A, B](a: Future[A])(f: A => Future[B]): Future[B] = a.flatMap(f)
-     |     def create[A](a: => A): Future[A] = Future { a }
+     |   def doAndThen[A, B](a: Future[A])(f: A => Future[B]): Future[B] = a.flatMap(f)
+     |   def create[A](a: A): Future[A] = Future { a }
      | }
-futureExec: Execution[scala.concurrent.Future] = $anon$1@6df40d43
+futureExec: Execution[scala.concurrent.Future] = $anon$1@8c06a3b
 ```
 
 We can now build an asynchronous and a synchronous version of our hello program:
@@ -168,3 +171,58 @@ syncHello: String
 scala> def asyncHello: Future[String] = hello(AsyncConsoleTerminal, futureExec)
 asyncHello: scala.concurrent.Future[String]
 ```
+
+So what is this execution thing that we have to implement in order to use to build our hello program using the higher kinded type `C[_]`? From what I understand, it's an instance of the `Monad`. If you've used the `Option` or the `Future`, you've used a `Monad` before. With these two, you can have syntax like this:
+
+```scala
+scala> val opt1 = Option(1)
+opt1: Option[Int] = Some(1)
+
+scala> val opt2 = Option(2)
+opt2: Option[Int] = Some(2)
+
+scala> val opt3 = for {
+     |   v1 <- opt1
+     |   v2 <- opt2
+     | } yield v1 + v2
+opt3: Option[Int] = Some(3)
+```
+
+The `for` comprehension in `Scala` is a syntax sugar for when you work with a `Monad`. Can we use this syntax with our execution monad? Not just yet, we have to update it a little. The for comprehension use `flatMap` and `map`, so we want our execution thingy, to have these.
+
+```scala
+scala> trait Execution[C[_]] {
+     |   def doAndThen[A, B](a: C[A])(f: A => C[B]): C[B]
+     |   def create[A](a: A): C[A]
+     | }
+defined trait Execution
+
+scala> object Execution {
+     |   implicit class Ops[A, C[_]](c: C[A]) {
+     |     def flatMap[B](f: A => C[B])(implicit e: Execution[C]): C[B] =
+     |       e.doAndThen(c)(f)
+     |     def map[B](f: A => B)(implicit e: Execution[C]): C[B] = {
+     |       e.doAndThen(c)(f andThen e.create)
+     |     }
+     |   } 
+     | }
+defined object Execution
+warning: previously defined trait Execution is not a companion to object Execution.
+Companions must be defined together; you may wish to use :paste mode for this.
+```
+
+With that in hand, we can go ahead and clean up our `hello` function:
+
+```scala
+scala> def hello[C[_]](term: Terminal[C])(implicit e: Execution[C]): C[String] = {
+     |   import Execution._
+     | 
+     |   for {
+     |     in <- term.read
+     |     _ <- term.write(in)
+     |   } yield in
+     | }
+hello: [C[_]](term: Terminal[C])(implicit e: Execution[C])C[String]
+```
+
+With the `implicit class`, we turned our `Execution` trait into a Monad that we were able to leverage to build our hello program. Now functionnal libraries like `scalaz` and `cats` allow you to do that very cleanly.
